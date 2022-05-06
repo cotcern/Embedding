@@ -32,7 +32,7 @@
 using namespace std;
 using namespace o2::mch;
 
-void Embedding_test(const char *filename = "toto.root", const char *filename2 = "mchdigits.root")
+void Embedding_test(const char *filename = "toto.root", const char *filename2 = "mchdigits-0.root")
 {
 //______________________
     //Data extraction
@@ -40,16 +40,21 @@ void Embedding_test(const char *filename = "toto.root", const char *filename2 = 
     auto TFtime = 0;
     vector<Digit>* digitou = 0;
     vector<Digit>* digitou2 = 0;
+    vector<int> v1;
     vector<ROFRecord>* rof = 0;
     vector<ROFRecord>* rof2 = 0;
+    o2::dataformats::MCTruthContainer<o2::MCCompLabel>* MCLab = 0;
+    const o2::dataformats::MCTruthContainer<o2::MCCompLabel> MCLabtemp;
+    o2::dataformats::MCTruthContainer<o2::MCCompLabel>* MCLab2 = 0;
     vector<Digit>* digitouAll = 0;
+    vector<Digit>* digitouAlltemp = 0;
     vector<ROFRecord>* rofAll = 0;
+    o2::dataformats::MCTruthContainer<o2::MCCompLabel>* MCLabAll = 0;
     TFile hfile("treeEmbed.root","RECREATE");
-    TTree *treeOutput = new TTree("o2Embed","treeOutput");
-    auto branchDig = treeOutput->Branch("digits", &digitouAll);
-    auto branchRof = treeOutput->Branch("rofs", &rofAll);
-    TH1F *hTF   = new TH1F("hTF","TF distribution",100,0,1200000);
-    TH1F *hTF2   = new TH1F("hTF2","TF distribution 2",100,0,10000);
+    TTree *treeOutput = new TTree("o2sim","treeOutput");
+    auto branchDig = treeOutput->Branch("MCHDigit", &digitouAll);
+    auto branchRof = treeOutput->Branch("MCHROFRecords", &rofAll);
+    auto branchMCLab = treeOutput->Branch("MCHMCLabels", &MCLabAll);
 
     TFile *file = TFile::Open(filename,"read");
     
@@ -68,28 +73,48 @@ void Embedding_test(const char *filename = "toto.root", const char *filename2 = 
     }
     tree->SetBranchAddress("digits",&digitou);
     tree->SetBranchAddress("rofs",&rof);
+    //MCLab = 0;
     tree->GetEntry(0);
     
     TFile *file2 = TFile::Open(filename2,"read");
     TTree *tree2= (TTree*) file2->Get("o2sim");
+    //tree2->Show(0);
+    //tree2->Print();
     tree2->SetBranchAddress("MCHDigit",&digitou2);
     tree2->SetBranchAddress("MCHROFRecords",&rof2);
+    tree2->SetBranchAddress("MCHMCLabels",&MCLab2);
     tree2->GetEntry(0);
     
-    for (Int_t i = 0; i<int(digitou->size()); i++) {
-    	 for (Int_t j = 0; j<int(digitou2->size()); j++) {
-    		if(digitou->at(i).getPadID()==digitou2->at(j).getPadID() and digitou->at(i).getTime()==digitou2->at(j).getTime()){
-    			cout << "digits " << i << " and " << j << " : Pad = " << digitou->at(i).getADC() << ", TF = " << digitou->at(i).getTime() << ", ADC = " << digitou->at(i).getADC() << " and " << digitou2->at(j).getADC() << endl;
-    			digitou->at(i).setADC(digitou->at(i).getADC() + digitou2->at(j).getADC());
-    			digitou2->erase(digitou2->begin() + j);
+    digitou->insert( digitou->end(), digitou2->begin(), digitou2->end() );
+    digitouAll = digitou;
+    //digitouAlltemp = digitouAll;
+    int counter = 0;
+    
+    for (Int_t i = 0; i<int(digitouAll->size())-1; i++) {
+    	v1.push_back(digitouAll->at(i).getPadID());
+    	 for (Int_t j = i+1; j<int(digitouAll->size()); j++) {
+    		if(digitouAll->at(i).getPadID()==digitouAll->at(j).getPadID() and digitouAll->at(i).getTime()==digitouAll->at(j).getTime()){
+    			cout << "digits " << i << " and " << j << " : Pad = " << digitouAll->at(i).getPadID() << ", TF = " << digitouAll->at(i).getTime() << ", ADC = " << digitouAll->at(i).getADC() << " and " << digitouAll->at(j).getADC() << endl;
+    			//cout << digitouAlltemp->size() << endl;
+    			//digitouAll->at(j).setPadID(28671 + counter + 1);
+    			//digitouAlltemp->erase(digitouAlltemp->begin() + j - counter);
+    			counter++;
     		}
     	}
     }
     
-    digitou->insert( digitou->end(), digitou2->begin(), digitou2->end() );
-    digitouAll = digitou;
+    cout << *max_element(v1.begin(), v1.end()) << endl;
+    cout << *min_element(v1.begin(), v1.end()) << endl;
+    
+    //digitouAll = digitouAlltemp;
+    
+    //digitou->insert( digitou->end(), digitou2->begin(), digitou2->end() );
+    //digitouAll = digitou;
     rof->insert( rof->end(), rof2->begin(), rof2->end() );
     rofAll = rof;
+    //MCLab->insert( MCLab->end(), MCLab2->begin(), MCLab2->end() );
+    //MCLab2->mergeAtBack(MCLabtemp);
+    MCLabAll = MCLab2;
     treeOutput->Fill();
     
     hfile.cd();
@@ -97,10 +122,4 @@ void Embedding_test(const char *filename = "toto.root", const char *filename2 = 
     hfile.Close();
     
     return;
-    
-    //TCanvas * cTF = new TCanvas("cTF","Time Frame time");
-    //hTF->Draw();
-    //TCanvas * cTF2 = new TCanvas("cTF2","Time Frame time 2");
-    //hTF2->Draw();
-    
 }
