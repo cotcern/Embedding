@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <typeinfo>
+#include <algorithm>
 #include "MCHGeometryCreator/Geometry.h"
 #include "MCHGeometryTransformer/Transformations.h"
 #include "MCHGeometryTest/Helpers.h"
@@ -53,7 +54,7 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     vector<Digit>* digitouAll = 0;
     vector<ROFRecord>* rofAll = 0;
     MCTruthContainer<o2::MCCompLabel>* MCLabAll = 0;
-    TFile hfile("treeEmbed.root","RECREATE");
+    TFile hfile("mchdigits.root","RECREATE");
     TTree *treeOutput = new TTree("o2sim","treeOutput");
     auto branchDig = treeOutput->Branch("MCHDigit", &digitouAll);
     auto branchRof = treeOutput->Branch("MCHROFRecords", &rofAll);
@@ -86,34 +87,21 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
       	tree->GetEntry(n);
       	digitstemp.insert( digitstemp.end(), digitou->begin(), digitou->end() );
       	roftemp.insert( roftemp.end(), rof->begin(), rof->end() );
-      	//for (Int_t m = 0; m<int(digitou->size()); m++) {
-      		//MCLab->mergeAtBack(MCLabtemp);
-      		//MCLabtemp.addElements(0,MCLabtemp2);
-      		//cout << "here" << endl;
-      	//}
-      	//cout << roftemp.size() << endl;
-      	//cout << roftemp.at(roftemp.size()-1).getFirstIdx() << "," << roftemp.at(roftemp.size()-1).getLastIdx() << endl;
     }
     digitou = &digitstemp;
     rof = &roftemp;
     TFile *file2 = TFile::Open(filename2,"read");
     TTree *tree2= (TTree*) file2->Get("o2sim");
-    //tree2->Show(0);
-    //tree2->Print();
     tree2->SetBranchAddress("MCHDigit",&digitou2);
     tree2->SetBranchAddress("MCHROFRecords",&rof2);
     tree2->SetBranchAddress("MCHMCLabels",&MCLab2);
     tree2->GetEntry(0);
-    //MCLabtemp = *MCLab2;
     
     int counterErase = 0;
     int counterRof = 0;
     digitoutemp = *digitou;
     rofoutemp = *rof;
-    
-    for (Int_t i = 0; i<int(digitou->size()); i++) {
-   	 MCLabtemp.addElement(i, 0);
-    }
+    vector<int> eraseindex;
     
     for (Int_t i = 0; i<int(rof->size()); i++) {
    	 rofoutemp.at(i).setDataRef(counterRof, rof->at(i).getNEntries());
@@ -123,7 +111,7 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     
     for (Int_t i = 0; i<int(rof->size()); i++) {
    	 if (i%100 == 0) {
-   	 	cout << "Data : " << rof->at(i)  << endl;
+   	 	//cout << "Data : " << rof->at(i)  << endl;
    	 }
     }
 
@@ -136,21 +124,37 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     				digitoutemp.at(k-counterErase).setADC(digitou->at(j).getADC()+digitou->at(k).getADC());
     				digitoutemp.erase(digitoutemp.begin() + j - counterErase);
     				rofoutemp.at(i).setDataRef(rofoutemp.at(i).getFirstIdx(), rofoutemp.at(i).getNEntries()-1);
+    				eraseindex.push_back(j);
     				counterErase++;
     				break;
     			}
     		}
     	}
     }
+    
+    //cout << "N : " << MCLabtemp.getNElements() << endl;
+    int counterEraselab = 0;
+    for (Int_t i = 0; i<int(digitou->size()); i++) {
+    	if ( find(eraseindex.begin(), eraseindex.end(), i) != eraseindex.end() ){
+    	 	continue;
+    	 }
+    	 else{
+    	 	MCLabtemp.addElement(MCLabtemp.getNElements()-1, 0);
+    	 	counterEraselab++;
+    	 	
+    	 }
+    }
+    //cout << "N : " << MCLabtemp.getNElements() << endl;
+    
     digitou = &digitoutemp;
     rof = &rofoutemp;
-    
-    cout << digitou->size() << endl;
-    cout << MCLab2->getNElements() << " / " << digitou2->size() << "//" << MCLab2->getTruthArray().size()  << endl;
     
     counterErase = 0;
     digitoutemp2 = *digitou2;
     roftemp2 = *rof2;
+    
+    vector<int> eraseindex2;
+    
     for (Int_t i = 0; i<int(rof2->size()); i++) {
    	 //cout << "Sim : " << rof2->at(i) << endl;
 	}
@@ -165,6 +169,7 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
 	    			digitoutemp2.at(k-counterErase).setADC(digitou2->at(j).getADC()+digitou2->at(k).getADC());
 	    			digitoutemp2.erase(digitoutemp2.begin() + j - counterErase);
 	    			roftemp2.at(i).setDataRef(roftemp2.at(i).getFirstIdx(), roftemp2.at(i).getNEntries()-1);
+	    			eraseindex2.push_back(j);
 	    			counterErase++;
 	    			break;
 
@@ -173,31 +178,33 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     	}
     }
     
+    //cout << "N : " << MCLabtemp.getNElements() << endl;
     for (Int_t i = 0; i<int(digitou2->size()); i++) {
-    	cout << "here : " << MCLab2->getNElements() << " / " << digitou2->size() << " , " << MCLabtemp.getNElements() << " , " << MCLab2->getElement(i) << "//" << MCLab2->getTruthArray().at(i)  << endl;
-    	//MCCompLabel MCLabtemp2(MCLab2->getLabels(i)[0]);
-   	//MCLabtemp.addElement(i, 0);
+    	if ( find(eraseindex2.begin(), eraseindex2.end(), i) != eraseindex2.end() ){
+    	 	continue;
+    	 }
+    	 else {
+    	 	MCLabtemp.addElement(MCLabtemp.getNElements()-1, MCLab2->getElement(i));
+    	 }
     }
+    //cout << "N : " << MCLabtemp.getNElements() << endl;
     
-    cout << digitou->size() << " + " << digitou2->size() << " = " << digitou->size() + digitou2->size() << endl;
+    //cout << "digitou : " <<  digitou->size() << " + " << digitoutemp2.size() << " = " << digitou->size() + digitoutemp2.size() << endl;
+    
     digitou2 = &digitoutemp2;
     rof2 = &roftemp2;
     int n_1 = digitou->size();
     digitou->insert( digitou->end(), digitou2->begin(), digitou2->end() );
     digitouAll = digitou;
-    cout << digitou->size() << endl;
+    //cout << digitou->size() << endl;
     rof->insert( rof->end(), rof2->begin(), rof2->end() );
     rofAll = rof;
     
-    //for (Int_t m = 0; m<n_1; m++) {
-      	//cout << MCLab2->getIndexedSize() << "," << MCLab2->getNElements() << endl;
-      	//MCLab2->mergeAtBack(MCLabtemp);
-    //}
     
     for (Int_t i = 0; i<int(rof->size()); i++) {
    	 //cout << "Embed : " << rof->at(i) << endl;
    	 }
-    MCLabAll = MCLab2;
+    MCLabAll = &MCLabtemp;
     treeOutput->Fill();
     
     hfile.cd();
