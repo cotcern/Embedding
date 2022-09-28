@@ -38,7 +38,7 @@ using namespace o2::dataformats;
 void Embedding_test(const char *filename = "mchdigits-data.root", const char *filename2 = "mchdigits-0.root")
 {
 //______________________
-    //Data extraction
+    //Variables declaration
     int entries_number = 0;
     auto TFtime = 0;
     vector<Digit>* digitou = 0;
@@ -53,67 +53,56 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     vector<Digit>* digitouAll = 0;
     vector<ROFRecord>* rofAll = 0;
     MCTruthContainer<o2::MCCompLabel>* MCLabAll = 0;
+    int counterErase = 0; // number of erased digits
+    vector<int> eraseindex;    
+    vector<int> eraseindex2;
+    int counterRof = 0;
+    int counterEraselab = 0;
     
+    // Output file 
     TFile hfile("mchdigits.root","RECREATE");
     TTree *treeOutput = new TTree("o2sim","treeOutput");
-    auto branchDig = treeOutput->Branch("MCHDigit", &digitouAll);
-    auto branchRof = treeOutput->Branch("MCHROFRecords", &rofAll);
-    auto branchMCLab = treeOutput->Branch("MCHMCLabels", &MCLabAll);
+    auto branchDig = treeOutput->Branch("MCHDigit", &digitouAll); //Digit tree
+    auto branchRof = treeOutput->Branch("MCHROFRecords", &rofAll); //ReadOut Frames tree
+    auto branchMCLab = treeOutput->Branch("MCHMCLabels", &MCLabAll); //MC labels tree
 
+    // Real data input extraction
     TFile *file = TFile::Open(filename,"read");
-    
-    if(!file)
-    {
-     	cout << "Error :: The file is not found, please check"<< endl;
-     	return;
-    }
+    if(!file){cout << "Error :: The data file is not found, please check"<< endl;return;}
     TTree *tree= (TTree*) file->Get("o2sim");
-    if(!tree)
-    {
-     	cout << "Error :: The Tree is not found, please check"<< endl;
-     	return;
-    }
-    
+    if(!tree){	cout << "Error :: The data Tree is not found, please check"<< endl; return;}
     tree->SetBranchAddress("MCHDigit",&digitou);
     tree->SetBranchAddress("MCHROFRecords",&rof);
     
+    //Get real data input file entries
     tree->GetEntry(0);
     entries_number = tree->GetEntries();
     digitstemp = *digitou;
     roftemp = *rof;
     MCLab = 0;
-    for (Int_t n = 1; n<entries_number; n++) {
+    for (Int_t n = 1; n<entries_number; n++) { // for loop over entries filling digit and rof arrays
       	tree->GetEntry(n);
       	digitstemp.insert( digitstemp.end(), digitou->begin(), digitou->end() );
       	roftemp.insert( roftemp.end(), rof->begin(), rof->end() );
     }
     digitou = &digitstemp;
     rof = &roftemp;
-    TFile *file2 = TFile::Open(filename2,"read");
-    TTree *tree2= (TTree*) file2->Get("o2sim");
-    tree2->SetBranchAddress("MCHDigit",&digitou2);
-    tree2->SetBranchAddress("MCHROFRecords",&rof2);
-    tree2->SetBranchAddress("MCHMCLabels",&MCLab2);
-    tree2->GetEntry(0);
     
-    int counterErase = 0;
-    int counterRof = 0;
     digitoutemp = *digitou;
     rofoutemp = *rof;
-    vector<int> eraseindex;
-    
-    for (Int_t i = 0; i<int(rof->size()); i++) {
+    for (Int_t i = 0; i<int(rof->size()); i++) { // for loop over entries counting the rofs and ordering their parameters
    	 rofoutemp.at(i).setDataRef(counterRof, rof->at(i).getNEntries());
    	 counterRof += rof->at(i).getNEntries();
     }
     rof = &rofoutemp;
-
+    
+    // for loop over rofs and double for loop over digits within rof to erase them and replace by a unique one with summed charge
     for (Int_t i = 0; i<int(rof->size()); i++) {
     	rofoutemp.at(i).setDataRef(rof->at(i).getFirstIdx()-counterErase, rof->at(i).getNEntries());
     	for (Int_t j = int(rof->at(i).getFirstIdx()); j<int(rof->at(i).getLastIdx()); j++) {
     	 	for (Int_t k = j+1; k<int(rof->at(i).getLastIdx()+1); k++) {
     			if(digitou->at(j).getPadID()==digitou->at(k).getPadID() and digitou->at(j).getTime()==digitou->at(k).getTime()){
-    				//cout << "Data - ROF " << i << ", digits " << j << " and " << k << " : Pad = " << digitou->at(j).getPadID() << ", TF = " << digitou->at(j).getTime() << ", ADC = " << digitou->at(j).getADC() << " and " << digitou->at(k).getADC() << endl;
+    				cout << "Data - ROF " << i << ", digits " << j << " and " << k << " : Pad = " << digitou->at(j).getPadID() << ", TF = " << digitou->at(j).getTime() << ", ADC = " << digitou->at(j).getADC() << " and " << digitou->at(k).getADC() << endl;
     				digitoutemp.at(k-counterErase).setADC(digitou->at(j).getADC()+digitou->at(k).getADC());
     				digitoutemp.erase(digitoutemp.begin() + j - counterErase);
     				rofoutemp.at(i).setDataRef(rofoutemp.at(i).getFirstIdx(), rofoutemp.at(i).getNEntries()-1);
@@ -124,37 +113,43 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     		}
     	}
     }
-    
-    int counterEraselab = 0;
+	
+    // for loop over digits to add null entries for MClabels (none in real data)
     for (Int_t i = 0; i<int(digitou->size()); i++) {
     	if ( find(eraseindex.begin(), eraseindex.end(), i) != eraseindex.end() ){
     	 	continue;
     	 }
     	 else{
     	 	MCLabtemp.addElement(MCLabtemp.getNElements(), 0);
-    	 	counterEraselab++;
-    	 	
+    	 	counterEraselab++;	
     	 }
     }
-    
     digitou = &digitoutemp;
     rof = &rofoutemp;
     
+    // MC input extraction
+    TFile *file2 = TFile::Open(filename2,"read");
+    if(!file2){cout << "Error :: The MC file is not found, please check"<< endl;return;}
+    TTree *tree2= (TTree*) file2->Get("o2sim");
+    if(!tree2){cout << "Error :: The MC Tree is not found, please check"<< endl; return;}
+    tree2->SetBranchAddress("MCHDigit",&digitou2);
+    tree2->SetBranchAddress("MCHROFRecords",&rof2);
+    tree2->SetBranchAddress("MCHMCLabels",&MCLab2);
+    
+    //Get MC data input file entries
     counterErase = 0;
+    tree2->GetEntry(0);
     digitoutemp2 = *digitou2;
     roftemp2 = *rof2;
-    
-    vector<int> eraseindex2;
    	 
+    // for loop over rofs and double for loop over digits within rof to erase them and replace by a unique one with summed charge
     for (Int_t i = 0; i<int(rof2->size()); i++) {
-    roftemp2.at(i).setDataRef(digitou->size()+rof2->at(i).getFirstIdx()-counterErase, rof2->at(i).getNEntries());
-    
-    roftemp2.at(i).setBCData(rof->at(0).getBCData()+rof2->at(i).getBCData());
-    
-    	 for (Int_t j = int(rof2->at(i).getFirstIdx()); j<int(rof2->at(i).getLastIdx()); j++) {
-	    	 for (Int_t k = j+1; k<int(rof2->at(i).getLastIdx()+1); k++) {
+    	roftemp2.at(i).setDataRef(digitou->size()+rof2->at(i).getFirstIdx()-counterErase, rof2->at(i).getNEntries());
+    	roftemp2.at(i).setBCData(rof->at(0).getBCData()+rof2->at(i).getBCData());
+    	for (Int_t j = int(rof2->at(i).getFirstIdx()); j<int(rof2->at(i).getLastIdx()); j++) {
+	    	for (Int_t k = j+1; k<int(rof2->at(i).getLastIdx()+1); k++) {
 	    		if(digitou2->at(j).getPadID()==digitou2->at(k).getPadID() and digitou2->at(j).getTime()==digitou2->at(k).getTime()){
-	    			//cout << "Sim - ROF " << i << ", digits " << j << " and " << k << " : Pad = " << digitou2->at(j).getPadID() << ", TF = " << digitou2->at(j).getTime() << ", ADC = " << digitou2->at(j).getADC() << " and " << digitou2->at(k).getADC() << endl;
+	    			cout << "MC - ROF " << i << ", digits " << j << " and " << k << " : Pad = " << digitou2->at(j).getPadID() << ", TF = " << digitou2->at(j).getTime() << ", ADC = " << digitou2->at(j).getADC() << " and " << digitou2->at(k).getADC() << endl;
 	    			digitoutemp2.at(k-counterErase).setADC(digitou2->at(j).getADC()+digitou2->at(k).getADC());
 	    			digitoutemp2.erase(digitoutemp2.begin() + j - counterErase);
 	    			roftemp2.at(i).setDataRef(roftemp2.at(i).getFirstIdx(), roftemp2.at(i).getNEntries()-1);
@@ -167,6 +162,7 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     	}
     }
     
+    // for loop over digits to add MCLabels from MC input file
     for (Int_t i = 0; i<int(digitou2->size()); i++) {
     	if ( find(eraseindex2.begin(), eraseindex2.end(), i) != eraseindex2.end() ){
     	 	continue;
@@ -175,18 +171,20 @@ void Embedding_test(const char *filename = "mchdigits-data.root", const char *fi
     	 	MCLabtemp.addElement(MCLabtemp.getNElements(), MCLab2->getElement(i));
     	 }
     }
-    
     digitou2 = &digitoutemp2;
     rof2 = &roftemp2;
     
+    // Add the real data and MC rofs, digits and MC labels
     digitou->insert( digitou->end(), digitou2->begin(), digitou2->end() );
     digitouAll = digitou;
     rof->insert( rof->end(), rof2->begin(), rof2->end() );
     rofAll = rof;
     MCLabAll = &MCLabtemp;
     
+    // Fill tree
     treeOutput->Fill();
-    
+ 
+    // Write tree in output file
     hfile.cd();
     treeOutput->Write();
     hfile.Close();
