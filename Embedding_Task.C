@@ -61,10 +61,10 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     int counterEraselab = 0;
     int counterDigit = 0;
     bool toBeErased = false;
-    //TH1F *hTime   = new TH1F("hTime","Time distribution",10000,-200000,500000);
+    TH1F *hTime   = new TH1F("hTime","Time distribution",10000,-200000,500000);
     //TH1F *hTime1   = new TH1F("hTime1","Time distribution for rof 1",10000,-200000,500000);
     //TH1F *hTime2   = new TH1F("hTime2","Time distribution for rof 2",10000,-200000,500000);
-    //TH1F *hTimeMC   = new TH1F("hTimeMC","MC time distribution",1000,-200,10000);
+    TH1F *hTimeMC   = new TH1F("hTimeMC","MC time distribution",1000,-200,10000);
     //TH1F *hTimeDif   = new TH1F("hTimeDif","Time difference between first and last digit distribution",7,-2,5);
     //TH1F *hTimeDifRof   = new TH1F("hTimeDifRof","Time difference between consecutive rofs distribution",10100,-100,10000);
     //TH1F *hTimeDifDig   = new TH1F("hTimeDifDig","Time difference between consecutive digits distribution",2000,-1000,1000);
@@ -90,11 +90,11 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     digitstemp = *digitou;
     roftemp = *rof;
     MCLab = 0;
-    for (Int_t n = 1; n<entries_number; n++) { // for loop over entries filling digit and rof arrays
-      	tree->GetEntry(n);
-      	digitstemp.insert( digitstemp.end(), digitou->begin(), digitou->end() );
-      	roftemp.insert( roftemp.end(), rof->begin(), rof->end() );
-    }
+    //for (Int_t n = 1; n<entries_number; n++) { // for loop over entries filling digit and rof arrays
+    //  	tree->GetEntry(n);
+    //  	digitstemp.insert( digitstemp.end(), digitou->begin(), digitou->end() );
+    //  	roftemp.insert( roftemp.end(), rof->begin(), rof->end() );
+    //}
     digitou = &digitstemp;
     rof = &roftemp;
     
@@ -107,14 +107,14 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     }
     rof = &rofoutemp;
     
-    //for (Int_t u = 0; u<int(rof->size())-1; u++) {
+    for (Int_t u = 0; u<int(rof->size()); u++) {
     	//hTimeDif->Fill(digitou->at(rof->at(u).getLastIdx()).getTime()-digitou->at(rof->at(u).getFirstIdx()).getTime());
     	//hTimeDifRof->Fill(digitou->at(rof->at(u+1).getFirstIdx()).getTime()-digitou->at(rof->at(u).getLastIdx()).getTime());
-    	//for (Int_t i = rof->at(u).getFirstIdx(); i<int(rof->at(u).getLastIdx()); i++) {
+    	for (Int_t i = rof->at(u).getFirstIdx(); i<int(rof->at(u).getLastIdx()); i++) {
 	    	//cout << "Data - rof " << u << ", digit time : " << digitou->at(i).getTime() << endl;
-	    	//hTime->Fill(digitou->at(i).getTime());
-	//}
-    //}
+	    	hTime->Fill(digitou->at(i).getTime());
+	}
+    }
     //for (Int_t i = rof->at(10000).getFirstIdx(); i<int(rof->at(10000).getLastIdx()); i++) {
     //	    	hTime1->Fill(digitou->at(i).getTime());
     //}
@@ -147,11 +147,11 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     //digitoutemp2 = *digitou2;
     //roftemp2 = *rof2;
     
-    //for (Int_t u = 0; u<int(rof2->size()); u++) {
-    //	for (Int_t i = rof2->at(u).getFirstIdx(); i<int(rof2->at(u).getLastIdx()); i++) {
-    //	    	hTimeMC->Fill(digitou2->at(i).getTime());
-    //	}
-    //}
+    for (Int_t u = 0; u<int(rof2->size()); u++) {
+    	for (Int_t i = rof2->at(u).getFirstIdx(); i<int(rof2->at(u).getLastIdx()); i++) {
+    	    	hTimeMC->Fill(digitou2->at(i).getTime());
+    	}
+    }
     
     	//for (Int_t j = int(rof2->at(i).getFirstIdx()); j<int(rof2->at(i).getLastIdx()); j++) {
 	//    	for (Int_t k = j+1; k<int(rof2->at(i).getLastIdx()+1); k++) {
@@ -223,10 +223,10 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     treeOutput->Write();
     hfile.Close();
     
-    //TCanvas * cTime = new TCanvas("cTime","Time Distribution");
-    //hTime->Draw();
-    //TCanvas * cTimeMC = new TCanvas("cTimeMC","MC Time Distribution");
-    //hTimeMC->Draw();
+    TCanvas * cTime = new TCanvas("cTime","Time Distribution");
+    hTime->Draw();
+    TCanvas * cTimeMC = new TCanvas("cTimeMC","MC Time Distribution");
+    hTimeMC->Draw();
     //TCanvas * cTime1 = new TCanvas("cTime1","Time Distribution for rof 1");
     //hTime1->Draw();
     //TCanvas * cTime2 = new TCanvas("cTime2","Time Distribution for rof 2");
