@@ -61,11 +61,12 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     int counterEraselab = 0;
     int counterDigit = 0;
     bool toBeErased = false;
-    TH1F *hTime   = new TH1F("hTime","Time distribution",10000,-200000,500000);
+    TH1F *hTime   = new TH1F("hTime","Time distribution",700000,-200000,500000);
     //TH1F *hTime1   = new TH1F("hTime1","Time distribution for rof 1",10000,-200000,500000);
     //TH1F *hTime2   = new TH1F("hTime2","Time distribution for rof 2",10000,-200000,500000);
-    TH1F *hTimeMC   = new TH1F("hTimeMC","MC time distribution",1000,-200,10000);
-    //TH1F *hTimeDif   = new TH1F("hTimeDif","Time difference between first and last digit distribution",7,-2,5);
+    TH1F *hTimeMC   = new TH1F("hTimeMC","MC time distribution",700000,-200000,500000);
+    TH1F *hTimeEmbed   = new TH1F("hTimeEmbed","Embed time distribution",700000,-200000,500000);
+    //TH1F *hTimeDif   = new TH1F("hTimeDif","Time difference between first and last digit distribution",10100,-10000,100);
     //TH1F *hTimeDifRof   = new TH1F("hTimeDifRof","Time difference between consecutive rofs distribution",10100,-100,10000);
     //TH1F *hTimeDifDig   = new TH1F("hTimeDifDig","Time difference between consecutive digits distribution",2000,-1000,1000);
     
@@ -110,8 +111,7 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     for (Int_t u = 0; u<int(rof->size()); u++) {
     	//hTimeDif->Fill(digitou->at(rof->at(u).getLastIdx()).getTime()-digitou->at(rof->at(u).getFirstIdx()).getTime());
     	//hTimeDifRof->Fill(digitou->at(rof->at(u+1).getFirstIdx()).getTime()-digitou->at(rof->at(u).getLastIdx()).getTime());
-    	for (Int_t i = rof->at(u).getFirstIdx(); i<int(rof->at(u).getLastIdx()); i++) {
-	    	//cout << "Data - rof " << u << ", digit time : " << digitou->at(i).getTime() << endl;
+    	for (Int_t i = rof->at(u).getFirstIdx(); i<int(rof->at(u).getLastIdx())+1; i++) {
 	    	hTime->Fill(digitou->at(i).getTime());
 	}
     }
@@ -148,7 +148,7 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     //roftemp2 = *rof2;
     
     for (Int_t u = 0; u<int(rof2->size()); u++) {
-    	for (Int_t i = rof2->at(u).getFirstIdx(); i<int(rof2->at(u).getLastIdx()); i++) {
+    	for (Int_t i = rof2->at(u).getFirstIdx(); i<int(rof2->at(u).getLastIdx())+1; i++) {
     	    	hTimeMC->Fill(digitou2->at(i).getTime());
     	}
     }
@@ -168,23 +168,30 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     	//}
     //}
     
-    int u= 0;
-    int jtemp = 0;
-    counterDigit = 0;
+    int u= 0; //ROF index
+    int jtemp = 0;//Temporary digit index to check indentical ones
+    counterDigit = 0;//Counter of added digits
     //for loop to locate the real data rof and location where MC digits should be merged
-    for (Int_t i = 0; i<int(digitou2->size()); i++) {
-    	while (digitou2->at(i).getTime() > digitou->at(rof->at(u).getFirstIdx()).getTime()){
-    		//cout << "rof : " << u << " : Time " <<  digitou2->at(i).getTime() << "/" << digitou->at(rof->at(u).getFirstIdx()).getTime() << endl;
+    for (Int_t i = 0; i<0;i++){//int(digitou2->size()); i++) {
+    	while (digitou2->at(i).getTime() >= digitou->at(rof->at(u).getFirstIdx()).getTime()){
     		roftemp.at(u).setDataRef(rof->at(u).getFirstIdx() + counterDigit, rof->at(u).getNEntries());
     		u++;
     	}
+    	if (digitou2->at(i).getTime()>digitou->at(rof->at(u-1).getLastIdx()).getTime()){
+    		//cout << "Out from the ROF : " << digitou->at(rof->at(u-1).getLastIdx()).getTime() << " ; " << digitou2->at(i).getTime() << " ; " << digitou->at(rof->at(u).getFirstIdx()).getTime() << endl;
+    	}
+    	// First index of the correct ROF
     	int j = rof->at(u-1).getFirstIdx();
+    	//Determine the position where the digit should be merged in the ROF (before same timing)
     	while (digitou2->at(i).getTime() > digitou->at(j).getTime()){
-    		//cout << "digit : " << j << " : Time " <<  digitou2->at(i).getTime() << "/" << digitou->at(j).getTime() << endl;
     		j++;
     	}
-    	toBeErased = false;
+    	if (i == 0 or i == digitou2->size()-1) {
+    		cout << i << " - " << j << " / " << u << endl;
+    	}
+    	toBeErased = false; // initialize the boolean each step
 	jtemp = j;
+	//check if there is another digit with same padID and timing
 	while (digitou2->at(i).getTime() == digitou->at(jtemp).getTime() and !toBeErased){
 		if (digitou2->at(i).getPadID() == digitou->at(jtemp).getPadID()){
 			digitstemp.at(jtemp + counterDigit).setADC(digitou2->at(i).getADC()+digitou->at(jtemp).getADC());
@@ -194,16 +201,20 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
 		jtemp++;
 	}
 	if (!toBeErased) {
-    		digitstemp.insert(digitstemp.begin() + j-1 + counterDigit, digitou2->at(i));
-    		while (int(MCLabtemp.getNElements()) < j-1 + counterDigit) {
+    		digitstemp.insert(digitstemp.begin() + j + counterDigit, digitou2->at(i));
+    		roftemp.at(u-1).setDataRef(roftemp.at(u-1).getFirstIdx(), roftemp.at(u-1).getNEntries() + 1);
+    		while (int(MCLabtemp.getNElements()) < j + counterDigit) {
     			MCLabtemp.addElement(MCLabtemp.getNElements(), 0);
     		}
     		MCLabtemp.addElement(MCLabtemp.getNElements(), MCLab2->getElement(i));
     		counterDigit++;
-    		roftemp.at(u-1).setDataRef(rof->at(u-1).getFirstIdx(), rof->at(u-1).getNEntries() + 1);
     	}
-    	cout << "rof : " << u-1 << " - Digit " << i << "/" << digitou2->size() << " : Time " << digitou->at(j-1).getTime() << "/" << digitou2->at(i).getTime() << "/" << digitou->at(j).getTime() << endl;
+    	//cout << "rof : " << u-1 << " - Digit " << i << "/" << digitou2->size() << " : Time " << digitou->at(j-1).getTime() << "/" << digitou2->at(i).getTime() << "/" << digitou->at(j).getTime() << endl;
     }
+    for (Int_t i = u; i<roftemp.size(); i++) {
+    	roftemp.at(i).setDataRef(rof->at(i).getFirstIdx() + counterDigit, rof->at(i).getNEntries());
+    }
+    cout << " CounterDigit = " << counterDigit << endl;
     
     digitou2 = &digitoutemp2;
     rof2 = &roftemp2;
@@ -223,10 +234,21 @@ void Embedding_Task(const char *filename = "mchdigits-data.root", const char *fi
     treeOutput->Write();
     hfile.Close();
     
-    TCanvas * cTime = new TCanvas("cTime","Time Distribution");
+    for (Int_t u = 1; u<int(rofAll->size()); u++) {
+    	if (rofAll->at(u).getFirstIdx()-rofAll->at(u-1).getLastIdx() < 0){
+    		cout << " NEGATIVE : " << u << " : " << rofAll->at(u).getFirstIdx() << " / " << rofAll->at(u-1).getLastIdx() << endl;
+    	}
+    	for (Int_t i = rofAll->at(u).getFirstIdx(); i<int(rofAll->at(u).getLastIdx())+1; i++) {
+    	    	hTimeEmbed->Fill(digitouAll->at(i).getTime());
+    	}
+    }
+    
+    TCanvas * cTime = new TCanvas("cTime","Real data time Distribution");
     hTime->Draw();
-    TCanvas * cTimeMC = new TCanvas("cTimeMC","MC Time Distribution");
+    TCanvas * cTimeMC = new TCanvas("cTimeMC","MC data time Distribution");
     hTimeMC->Draw();
+    TCanvas * cTimeEmbed = new TCanvas("cTimeEmb","Embed data time Distribution");
+    hTimeEmbed->Draw();
     //TCanvas * cTime1 = new TCanvas("cTime1","Time Distribution for rof 1");
     //hTime1->Draw();
     //TCanvas * cTime2 = new TCanvas("cTime2","Time Distribution for rof 2");
