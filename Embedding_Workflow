@@ -1,0 +1,94 @@
+#include "TMath.h"
+#include "TTree.h"
+#include "TDirectory.h"
+#include "TH1.h"
+#include "TH2.h"
+#include "TFile.h"
+#include "TLorentzVector.h"
+#include "TVector.h"
+#include "TF1.h"
+#include "THashList.h"
+#include "TList.h"
+#include "TGraph.h"
+#include "TGraphErrors.h"
+#include "TCanvas.h"
+#include "TChain.h"
+#include <list>
+#include <iostream>
+#include <stdlib.h>
+#include <stdio.h>
+#include <typeinfo>
+#include <algorithm>
+#include "MCHGeometryCreator/Geometry.h"
+#include "MCHGeometryTransformer/Transformations.h"
+#include "MCHGeometryTest/Helpers.h"
+#include "SimulationDataFormat/MCCompLabel.h"
+#include "SimulationDataFormat/MCTruthContainer.h"
+#include "DataFormatsMCH/Digit.h"
+#include "DataFormatsMCH/ROFRecord.h"
+#include "MCHMappingInterface/Segmentation.h"
+#include "TGeoManager.h"
+#include <iomanip>
+#include <sstream>
+
+using namespace std;
+using namespace o2;
+using namespace o2::mch;
+using namespace o2::dataformats;
+
+void Embedding_Workflow(const char *filename = "mchdigits-data.root", const char *filename2 = "itsdigits.root", const char *filename3 = "o2_primary_vertex.root")
+{
+// system("o2-mch-reco-workflow")
+// system("o2-its-reco-workflow")
+// system("o2-primary-vertexing-workflow --vertex-track-matching-sources MCH --vertexing-sources ITS")
+
+//______________________
+    //Variables declaration
+    vector<PrimaryVertex>* vertexou = 0;
+    TH3F *hPos = new TH3F("hPos","Position distribution",100,-0.05,0.05,100,-0.05,0.05,100,-0.05,0.05);
+    
+    // Output file 
+    //TFile hfile("mchdigits.root","RECREATE");
+    //TTree *treeOutput = new TTree("o2sim","treeOutput");
+    //auto branchDig = treeOutput->Branch("MCHDigit", &digitouAll); //Digit tree
+    //auto branchRof = treeOutput->Branch("MCHROFRecords", &rofAll); //ReadOut Frames tree
+    //auto branchMCLab = treeOutput->Branch("MCHMCLabels", &MCLabAll); //MC labels tree
+
+    // Real data input extraction
+    TFile *file = TFile::Open(filename3,"read");
+    if(!file){cout << "Error :: The data file is not found, please check"<< endl;return;}
+    TTree *tree= (TTree*) file->Get("o2sim");
+    if(!tree){	cout << "Error :: The data Tree is not found, please check"<< endl; return;}
+    tree->SetBranchAddress("PrimaryVertex",&vertexou);
+
+    //tree->Print();
+    tree->GetEntry(0);
+    cout << vertexou->size() << endl;
+    
+    for (Int_t i = 0; i<int(vertexou->size()); i++) {
+   	 //vertexou->at(i).print();
+   	 //cout << vertexou->at(i).getX() << endl;
+   	 hPos->Fill(vertexou->at(i).getX(),vertexou->at(i).getY(),vertexou->at(i).getZ());
+    }
+    stringstream streamX, streamY, streamZ;
+    streamX << fixed << setprecision(3) << vertexou->at(0).getX();
+    streamY << fixed << setprecision(3) << vertexou->at(0).getY();
+    streamZ << fixed << setprecision(3) << vertexou->at(0).getZ();
+    string sX = streamX.str();
+    string sY = streamY.str();
+    string sZ = streamZ.str();
+    cout << sX << ", " << sY << ", " << sZ << endl;
+
+    string cmd("o2-sim -m PIPE ITS MCH -e TGeant3 -g pythia8pp -n 10 --configKeyValues='Diamond.position[0]=");
+    cmd += sX;
+    cmd += ";Diamond.position[1]=";
+    cmd += sY;
+    cmd += "; Diamond.position[2]=";
+    cmd += sZ;
+    cmd += "'";
+    system(cmd.c_str());
+
+    TCanvas * cPos = new TCanvas("cPos","Position Distribution");
+    hPos->Draw();
+
+}
